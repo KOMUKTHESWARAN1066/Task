@@ -10,107 +10,222 @@ import JobTypeMaster from "./components/JobTypeMaster";
 import EmployeeMaster from "./components/EmployeeMaster";
 import CustomerJobMaster from "./components/CustomerJobMaster";
 import ProtectedRoute from "./components/ProtectedRoute";
-import "./menu.css"; // Assuming CSS is placed here
+import EmployeeJobs from "./components/EmployeeJobs";
+import Billed from "./components/Billed";
+import Payment from "./components/payment";
+import Payment_completed from "./components/Payment_completed";
+import "./menu.css";
 import Header from "./components/header";
 import Footer from "./components/footer";
+import Home from "./components/Home";
+import Customer_sales from "./components/sales";
 
 const App = () => {
+  const [submenuOpen, setSubmenuOpen] = useState({
+    general: false,
+    job: false,
+  });
   const [menuOpen, setMenuOpen] = useState(false);
   const [token, setToken] = useState(localStorage.getItem("token"));
-  const navigate = useNavigate(); // Redirect after logout
+  const flag = localStorage.getItem("flag");
+  const empname = localStorage.getItem("empname");
+
+  
+  
+  const navigate = useNavigate();
 
   // ✅ Manual Logout Function
   const handleLogout = async () => {
     const logID = localStorage.getItem("logID");
+    const empid = localStorage.getItem("empID");
 
     if (!logID) {
-      console.warn("No logID found in localStorage.");
-      return;
+        console.warn("No logID found in localStorage.");
+        return;
     }
 
     try {
-      const response = await axios.post("https://103.38.50.149:5001/api/logout", { logID });
-      console.log("Logout response:", response.data);
+        await axios.post("https://103.38.50.149:5001/api/logout", { logID });
 
-      // Clear localStorage & Update State
-      localStorage.removeItem("logID");
-      localStorage.removeItem("token");
-      setToken(null); // Update state to hide menu/logout
-      navigate("/"); // Redirect to login page
+        // ✅ Clear only necessary items from localStorage
+        localStorage.removeItem("logID");
+        localStorage.removeItem("token");
+        localStorage.removeItem("username");
+        localStorage.removeItem("empname");
+        localStorage.removeItem("empID");
+        localStorage.removeItem("flag");
+
+        // ✅ Notify other tabs that THIS specific user logged out
+        localStorage.setItem("logout_user", empid);
+        window.dispatchEvent(new Event("storage"));
+
+        // ✅ Redirect to login page
+        setToken(null);
+        navigate("/");
+
+        // ✅ Force a full page reload to remove UI traces
+        setTimeout(() => window.location.reload(), 100);
     } catch (error) {
-      console.error("Logout failed:", error.response?.data || error.message);
+        console.error("Logout failed:", error.response?.data || error.message);
+    }
+};
+
+useEffect(() => {
+  const storedToken = localStorage.getItem("token");
+  const currentUser = localStorage.getItem("empID");
+ 
+
+  if (storedToken) {
+      let lastPage = sessionStorage.getItem("lastPage");
+      let count = parseInt(sessionStorage.getItem("count"), 10) || 0;
+      // ✅ If lastPage is "/" (login page) or null, go to Home
+      if (!lastPage || lastPage === "/") {
+          lastPage = "/Home";
+          if(count===0){
+            navigate(lastPage);
+            count++;
+            sessionStorage.setItem("count", count.toString());
+           
+          }
+
+          
+      }
+      
+      
+  } else {
+    
+      navigate("/"); 
+    
+  }
+
+  const handleStorageChange = (event) => {
+      if (event.key === "logout_user") {
+          const loggedOutUser = event.newValue;
+          if (loggedOutUser === currentUser) {  
+              navigate("/");
+              setTimeout(() => window.location.reload(), 100);
+          }
+      }
+  };
+
+  // ✅ Handle screen resize to show/hide menu
+  const handleResize = () => {
+      setMenuOpen(window.innerWidth >= 1024);
+  };
+
+  handleResize(); 
+
+  window.addEventListener("resize", handleResize);
+  window.addEventListener("storage", handleStorageChange);
+
+  // ✅ Save the last visited page before navigation
+  const savePage = () => {
+      const currentPage = window.location.pathname;
+      if (currentPage !== "/") {
+          sessionStorage.setItem("lastPage", currentPage);
+          sessionStorage.setItem("count", "0"); // ✅ Correct
+
+          
+          
+
+      }
+  };
+
+  window.addEventListener("beforeunload", savePage);
+  window.addEventListener("popstate", savePage); 
+
+  return () => {
+      window.removeEventListener("beforeunload", savePage);
+      window.removeEventListener("popstate", savePage);
+      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("storage", handleStorageChange);
+  };
+}, [navigate]);
+
+
+  const toggleMenu = () => {
+    setMenuOpen(!menuOpen);
+  };
+
+  const toggleSubmenu = (menu) => {
+    setSubmenuOpen((prev) => ({ ...prev, [menu]: !prev[menu] }));
+  };
+
+  const handleMenuClick = (event) => {
+    if (window.innerWidth < 1024) {
+      setMenuOpen(false);
+      event.stopPropagation();
     }
   };
 
-  // ✅ Auto Logout on Tab Close
-  useEffect(() => {
-    const handleTabClose = () => {
-      const logID = localStorage.getItem("logID");
-      console.log("Stored Token in useEffect:", logID);
-      if (!logID) return;
-
-      const logoutURL = "https://103.38.50.149:5001/api/logout";
-      const data = JSON.stringify({ logID });
-
-      navigator.sendBeacon(logoutURL, data);
-
-      // ✅ Remove token & Update State
-      localStorage.removeItem("logID");
-      localStorage.removeItem("token");
-      setToken(null); // ✅ Update state to reflect logout
-    };
-
-    window.addEventListener("beforeunload", handleTabClose);
-
-    return () => {
-      window.removeEventListener("beforeunload", handleTabClose);
-    };
-  }, []);
-
-  // Function to close the menu when an option is clicked
-  const handleMenuClick = () => {
-    setMenuOpen(false);
-  };
-
   return (
-    <div className="container">
-       {/* ✅ Header */}
-       <Header />
-      {/* ✅ Show Menu & Logout Only If Logged In */}
-      {token ? (
+    <div className="cont">
+      <Header />
+      <ProtectedRoute>
+      {token &&  (
         <>
-          <button className="menu-button" onClick={() => setMenuOpen(!menuOpen)}>
+          <button className="menu-button" onClick={toggleMenu}>
             ☰ Menu
           </button>
-
           {menuOpen && (
-            <nav className={`menu ${menuOpen ? 'menuOpen' : ''}`}>
-              {/* Close button to close the menu */}
-              <button className="close-menu-button" onClick={handleMenuClick}>
-                ✖
-              </button>
+            <nav className="nav container">
 
-              <ul>
-                <li><Link to="/customer" onClick={handleMenuClick}>Customer details</Link></li>
-                <li><Link to="/state" onClick={handleMenuClick}>State Master</Link></li>
-                <li><Link to="/country" onClick={handleMenuClick}>Country Master</Link></li>
-                <li><Link to="/employee" onClick={handleMenuClick}>Employee Master</Link></li>
-                <li><Link to="/job-type" onClick={handleMenuClick}>Job Type Master</Link></li>
-                <li><Link to="/job" onClick={handleMenuClick}>Job Master</Link></li>
-                <li><Link to="/customer-job" onClick={handleMenuClick}>Customer Job Master</Link></li>
-              </ul>
+              <div className={`nav__menu ${menuOpen ? "menuOpen" : ""}`}>
+                
+                <ul className="nav__list">
+                  
+                    <>
+                      <li>
+                        <Link to="/Home" className="nav__link">🏠 Home</Link>
+                      </li>
+                      <li>
+                        <span className="nav__link" onClick={() => toggleSubmenu("general")}>
+                          General {submenuOpen.general ? "▲" : "▼"}
+                        </span>
+                        {submenuOpen.general && (
+                          <ul className={`submenu ${submenuOpen.general ? "submenu-open" : ""}`}>
+                            <li className="nav__item"><Link to="/country" className="nav__link">Country</Link></li>
+                            <li className="nav__item"><Link to="/state" className="nav__link">State</Link></li>
+                          </ul>
+                        )}
+                      </li>
+                      <li>
+                        <span className="nav__link" onClick={() => toggleSubmenu("job")}>
+                          Job Master {submenuOpen.job ? "▲" : "▼"}
+                        </span>
+                        {submenuOpen.job && (
+                          <ul className={`submenu ${submenuOpen.job ? "submenu-open" : ""}`}>
+                            <li className="nav__item"><Link to="/job-type" className="nav__link">Job Type</Link></li>
+                            <li className="nav__item"><Link to="/job" className="nav__link">Job</Link></li>
+                          </ul>
+                        )}
+                      </li>
+                      {flag?.toLowerCase() === "true" && (
+                        <li className="nav__item"><Link to="/employee" className="nav__link">Employee Master</Link></li>
+                      )}
+                      <li className="nav__item"><Link to="/customer" className="nav__link">Customer Master</Link></li>
+                      <li className="nav__item"><Link to="/customer-job" className="nav__link">Customer Job Master</Link></li>
+                      <li className="nav__item"><Link to="/employee-jobs" className="nav__link">Pending Jobs</Link></li>
+                      <li className="nav__item"><Link to="/Billed" className="nav__link">To Be Billed</Link></li>
+                      <li className="nav__item"><Link to="/Payment" className="nav__link">Pending Payments</Link></li>
+                      <li className="nav__item"><Link to="/Payment_completed" className="nav__link">Completed Jobs</Link></li>
+                      <li className="nav__item"><Link to="/Customer_sales" className="nav__link">Customer Purchase & Sales</Link></li>
+                      <li className="nav__item">
+                        <button className="button button__header" onClick={handleLogout}>Logout</button>
+                      </li>
+                    </>
+                 
+                </ul>
+              
+              </div>
             </nav>
           )}
-
-          <button className="logout-button" onClick={handleLogout}>
-            Logout
-          </button>
         </>
-      ) : null}
-
+      )}</ProtectedRoute>
       <div className="content">
         <Routes>
           <Route path="/" element={<Login setToken={setToken} />} />
+          <Route path="/Home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
           <Route path="/customer" element={<ProtectedRoute><CustomerMaster /></ProtectedRoute>} />
           <Route path="/state" element={<ProtectedRoute><StateMaster /></ProtectedRoute>} />
           <Route path="/country" element={<ProtectedRoute><CountryMaster /></ProtectedRoute>} />
@@ -118,12 +233,14 @@ const App = () => {
           <Route path="/job-type" element={<ProtectedRoute><JobTypeMaster /></ProtectedRoute>} />
           <Route path="/job" element={<ProtectedRoute><JobMaster /></ProtectedRoute>} />
           <Route path="/customer-job" element={<ProtectedRoute><CustomerJobMaster /></ProtectedRoute>} />
+          <Route path="/employee-jobs" element={<ProtectedRoute><EmployeeJobs /></ProtectedRoute>} />
+          <Route path="/Billed" element={<ProtectedRoute><Billed /></ProtectedRoute>} />
+          <Route path="/Payment" element={<ProtectedRoute><Payment /></ProtectedRoute>} />
+          <Route path="/Payment_completed" element={<ProtectedRoute><Payment_completed /></ProtectedRoute>} />
+          <Route path="/Customer_sales" element={<ProtectedRoute><Customer_sales /></ProtectedRoute>} />
         </Routes>
       </div>
-       <div>
-        {/* ✅ Footer */}
-       <Footer />
-       </div>
+      <Footer />
     </div>
   );
 };

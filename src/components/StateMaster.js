@@ -3,10 +3,14 @@ import axios from "axios";
 import "./state.css";
 
 
+const empID = localStorage.getItem("empID");
+const flag = localStorage.getItem("flag");
+
+
 const StateMaster = () => {
-  const [formData, setFormData] = useState({
-    stateName: "",
-    countryID: "",
+  const [selectedState, setSelectedState] = useState({
+    StateName: "",
+    CountryID: "",
   });
 
   const [states, setStates] = useState([]);
@@ -14,13 +18,6 @@ const StateMaster = () => {
   const [editingStateID, setEditingStateID] = useState(null);
   const [message, setMessage] = useState("");
 
-  // ✅ New state to manage selected state during edit
-  const [selectedState, setSelectedState] = useState({
-    stateName: "",
-    CountryID: "",
-  });
-
-  // Fetch States and Countries on Load
   useEffect(() => {
     fetchStates();
     fetchCountries();
@@ -30,7 +27,6 @@ const StateMaster = () => {
     try {
       const response = await axios.get("https://103.38.50.149:5001/api/states");
       setStates(response.data);
-      console.log("Fetched States:", response.data);
     } catch (error) {
       console.error("Error fetching states:", error);
     }
@@ -42,24 +38,25 @@ const StateMaster = () => {
         "https://103.38.50.149:5001/api/countries"
       );
       setCountries(response.data);
-      console.log("Fetched Countries:", response.data);
     } catch (error) {
       console.error("Error fetching countries:", error);
     }
   };
 
   const handleChange = (e) => {
-    setSelectedState({ ...selectedState, [e.target.name]: e.target.value });
+    setSelectedState({
+      ...selectedState,
+      [e.target.name]: e.target.value,
+    });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Form Data:", selectedState);
+
     const updatedState = {
-      StateName: selectedState.stateName, // Ensure it matches backend field
-      CountryID: selectedState.CountryID,
+      StateName: selectedState.StateName,
+      CountryID: parseInt(selectedState.CountryID, 10),
     };
-    console.log("Updated State:", updatedState);
 
     try {
       if (editingStateID) {
@@ -69,10 +66,7 @@ const StateMaster = () => {
         );
         setMessage("State updated successfully!");
       } else {
-        await axios.post(
-          "https://103.38.50.149:5001/api/states",
-          selectedState
-        );
+        await axios.post("https://103.38.50.149:5001/api/states", updatedState);
         setMessage("State added successfully!");
       }
 
@@ -80,28 +74,37 @@ const StateMaster = () => {
       setSelectedState({ StateName: "", CountryID: "" });
       setEditingStateID(null);
     } catch (error) {
-      console.error("Error saving state:", error);
-      setMessage("Error saving state.");
+      if (error.response) {
+        // ✅ Server responded with a status code outside the 2xx range
+        if (error.response.status === 400) {
+          setMessage(error.response.data.error || "State already exists.");
+        } else if (error.response.status === 500) {
+          setMessage("Server error. Please try again later.");
+        } else {
+          setMessage(`Unexpected error: ${error.response.status}`);
+        }
+        console.error("API Error Response:", error.response.data);
+      } else if (error.request) {
+        // ✅ Request was made, but no response received
+        setMessage("No response from server. Check your network connection.");
+        console.error("No response received:", error.request);
+      } else {
+        // ✅ Other unexpected errors
+        setMessage("An unexpected error occurred.");
+        console.error("Unexpected error:", error.message);
+      }
     }
   };
 
   const handleEdit = (state) => {
-    console.log("Editing state:", state);
     setSelectedState({
-      stateName: state.StateName,
-      CountryID: state.CountryID, // ✅ Use CountryID, not CountryName
+      StateName: state.StateName,
+      CountryID: state.CountryID,
     });
     setEditingStateID(state.StateID);
   };
 
   const handleDelete = async (stateID) => {
-    if (!stateID) {
-      console.error("Error: stateID is undefined!");
-      setMessage("Error deleting state. State ID is missing.");
-      return;
-    }
-
-    console.log("Deleting state with ID:", stateID);
     try {
       await axios.delete(`https://103.38.50.149:5001/api/states/${stateID}`);
       setMessage("State deleted successfully!");
@@ -114,42 +117,47 @@ const StateMaster = () => {
 
   return (
     <div className="state-container">
-      
       <h2>State Master</h2>
       {message && <p className="message">{message}</p>}
 
       {/* Form Section */}
       <form className="state-form" onSubmit={handleSubmit}>
-        <div className="form-group">
-          <input
-            type="text"
-            name="stateName"
-            value={selectedState.stateName || ""}
-            placeholder="Enter State Name"
-            onChange={handleChange}
-            required
-          />
-        </div>
-
-        {/* Dropdown for Country Selection */}
-        <div className="form-group">
-          <label>Country Name:</label>
-          <select
-            name="CountryID"
-            value={selectedState.CountryID || ""}
-            onChange={handleChange}
-          >
-            <option value="">Select Country</option>
-            {countries.map((country) => (
-              <option key={country.CountryID} value={country.CountryID}>
-                {country.CountryName}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="form-group full-width">
-          <button type="submit">{editingStateID ? "Update" : "Submit"}</button>
+        <div className="form-row">
+          {" "}
+          {/* Flex container */}
+          {/* State Name Input */}
+          <div className="form-group">
+            <input
+              type="text"
+              name="StateName"
+              value={selectedState.StateName || ""}
+              placeholder="Enter State Name"
+              onChange={handleChange}
+              required
+            />
+          </div>
+          {/* Country Name Dropdown */}
+          <div className="form-group">
+            <select
+              name="CountryID"
+              value={selectedState.CountryID || ""}
+              onChange={handleChange}
+              required
+            >
+              <option value="">Select Country</option>
+              {countries.map((country) => (
+                <option key={country.CountryID} value={country.CountryID}>
+                  {country.CountryName}
+                </option>
+              ))}
+            </select>
+          </div>
+          {/* Submit Button */}
+          <div className="form-group">
+            <button type="submit">
+              {editingStateID ? "Update" : "Submit"}
+            </button>
+          </div>
         </div>
       </form>
 
@@ -188,8 +196,6 @@ const StateMaster = () => {
           </table>
         </div>
       )}
-
-     
     </div>
   );
 };

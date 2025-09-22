@@ -3,6 +3,8 @@ import axios from "axios";
 import "./CountryMaster.css";
 
 
+const empID = localStorage.getItem("empID");
+const flag = localStorage.getItem("flag");
 
 const CountryMaster = () => {
   const [formData, setFormData] = useState({ CountryID: "", CountryName: "" });
@@ -41,25 +43,50 @@ const CountryMaster = () => {
     try {
       if (editingID) {
         // Update existing country
-        const response = await axios.put(`api/countries/${editingID}`, {
-          CountryName: formData.CountryName,
-        });
+        const response = await axios.put(
+          `https://103.38.50.149:5001/api/countries/${editingID}`,
+          {
+            CountryName: formData.CountryName,
+          }
+        );
         if (response.data.success) {
           setMessage("Country updated successfully!");
         }
+        setMessage("Country updated successfully!");
       } else {
         // Add new country
-        const response = await axios.post("api/countries", {
-          CountryName: formData.CountryName,
-        });
+        const response = await axios.post(
+          "https://103.38.50.149:5001/api/countries",
+          {
+            CountryName: formData.CountryName,
+          }
+        );
         if (response.data.success) {
           setMessage("Country added successfully!");
         }
       }
+      setMessage("Country added successfully!");
       fetchCountries(); // Refresh the list
     } catch (error) {
-      console.error("Error saving country:", error);
-      setMessage("Error saving country.");
+      if (error.response) {
+        // ✅ Server responded with an error status code
+        if (error.response.status === 400) {
+          setMessage(error.response.data.error || "Country already exists.");
+        } else if (error.response.status === 500) {
+          setMessage("Server error. Please try again later.");
+        } else {
+          setMessage(`Unexpected error: ${error.response.status}`);
+        }
+        console.error("API Error Response:", error.response.data);
+      } else if (error.request) {
+        // ✅ Request was made, but no response received
+        setMessage("No response from server. Check your network connection.");
+        console.error("No response received:", error.request);
+      } else {
+        // ✅ Other unexpected errors
+        setMessage("An unexpected error occurred.");
+        console.error("Unexpected error:", error.message);
+      }
     }
 
     setFormData({ CountryID: "", CountryName: "" }); // Reset form
@@ -90,13 +117,15 @@ const CountryMaster = () => {
       fetchCountries(); // Refresh the list
     } catch (error) {
       console.error("Error deleting country:", error);
-      setMessage("Error deleting country.");
+      setMessage(
+        error.response?.data?.error ||
+          "This country has associated states. Delete the states first."
+      );
     }
   };
 
   return (
     <div className="country-container">
-     
       <h2>Country Master</h2>
       {message && <p className="message">{message}</p>}
 
@@ -122,7 +151,7 @@ const CountryMaster = () => {
       ) : (
         countries.length > 0 && (
           <div className="country-list">
-            <h3>Stored Countries</h3>
+            <h3>Countries List</h3>
             <table>
               <thead>
                 <tr>
@@ -150,8 +179,6 @@ const CountryMaster = () => {
           </div>
         )
       )}
-
-     
     </div>
   );
 };

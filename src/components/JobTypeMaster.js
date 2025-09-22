@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import "./jobMaster.css";
+import "./jobtype.css";
+
+
+const empID = localStorage.getItem("empID");
+const flag = localStorage.getItem("flag");
 
 
 const JobMaster = () => {
@@ -10,7 +14,8 @@ const JobMaster = () => {
 
   const [jobs, setJobs] = useState([]);
   const [editingIndex, setEditingIndex] = useState(null);
-  const [editingJobId, setEditingJobId] = useState(null);
+  const [editingJobTypeId, setEditingJobTypeId] = useState(null);
+  const [message, setMessage] = useState("");
 
   const API_URL = "https://103.38.50.149:5001/api/jobtypes"; // Adjust if your backend runs on a different port
 
@@ -39,10 +44,10 @@ const JobMaster = () => {
     try {
       if (editingIndex !== null) {
         // **Update Job Type**
-        await axios.put(`${API_URL}/${editingJobId}`, formData);
+        await axios.put(`${API_URL}/${editingJobTypeId}`, formData);
         fetchJobs();
         setEditingIndex(null);
-        setEditingJobId(null);
+        setEditingJobTypeId(null);
       } else {
         // **Create New Job Type**
         await axios.post(API_URL, formData);
@@ -50,8 +55,27 @@ const JobMaster = () => {
       }
 
       setFormData({ jobTypeName: "" });
+      setMessage(""); // Clear any previous error messages
     } catch (error) {
-      console.error("Error saving job:", error);
+      if (error.response) {
+        // Server responded with a status code outside the 2xx range
+        if (error.response.status === 400) {
+          setMessage(error.response.data.error || "JobType already exists.");
+        } else if (error.response.status === 500) {
+          setMessage("Server error. Please try again later.");
+        } else {
+          setMessage(`Unexpected error: ${error.response.status}`);
+        }
+        console.error("API Error Response:", error.response.data);
+      } else if (error.request) {
+        // Request was made but no response received
+        setMessage("No response from server. Check your network.");
+        console.error("No response received:", error.request);
+      } else {
+        // Other unexpected errors
+        setMessage("An unexpected error occurred.");
+        console.error("Unexpected error:", error.message);
+      }
     }
   };
 
@@ -60,7 +84,7 @@ const JobMaster = () => {
     const job = jobs[index];
     setFormData({ jobTypeName: job.jobTypeName });
     setEditingIndex(index);
-    setEditingJobId(job.jobID);
+    setEditingJobTypeId(job.jobTypeID);
   };
 
   // **Handle Delete Job Type**
@@ -70,13 +94,14 @@ const JobMaster = () => {
       fetchJobs();
     } catch (error) {
       console.error("Error deleting job:", error);
+      setMessage("Failed to delete JobType. Please try again.");
     }
   };
 
   return (
     <div className="job-container">
-      
       <h2>Job Type Master</h2>
+      {message && <p className="message">{message}</p>}
       <form className="job-form" onSubmit={handleSubmit}>
         <div className="form-group">
           <label>Job Type Name:</label>
@@ -109,7 +134,7 @@ const JobMaster = () => {
             </thead>
             <tbody>
               {jobs.map((job, index) => (
-                <tr key={job.jobID}>
+                <tr key={job.jobTypeID}>
                   <td>{job.jobTypeName}</td>
                   <td>
                     <button
@@ -120,7 +145,7 @@ const JobMaster = () => {
                     </button>
                     <button
                       className="delete-btn"
-                      onClick={() => handleDelete(job.jobID)}
+                      onClick={() => handleDelete(job.jobTypeID)}
                     >
                       Delete
                     </button>
@@ -131,8 +156,6 @@ const JobMaster = () => {
           </table>
         </div>
       )}
-
-      
     </div>
   );
 };

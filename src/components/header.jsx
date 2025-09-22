@@ -3,6 +3,9 @@ import axios from "axios";
 
 const Header = () => {
   const [companyName, setCompanyName] = useState("");
+ 
+  const empname = localStorage.getItem("empname") || "";
+const loginTime = localStorage.getItem("time") || "";
 
   useEffect(() => {
     axios
@@ -18,9 +21,18 @@ const Header = () => {
   }, []);
 
   return (
-    <header className="bg-blue-600 text-white text-lg md:text-2xl font-semibold p-4 shadow-md text-center w-full">
-      {companyName || "Loading..."}
-    </header>
+    <header className="bg-blue-600 text-white text-lg md:text-2xl font-semibold p-4 shadow-md w-full flex items-center relative">
+    <h3>  {companyName || "Loading..."}</h3>
+  
+    {empname && loginTime && (
+      <p className="text-sm md:text-lg">
+        <strong>👤 {empname} | ⏱ {loginTime}</strong>
+      </p>
+    )}
+
+ 
+</header>
+
   );
 };
 

@@ -5,6 +5,7 @@
     background: #f9f9f9;
     border-radius: 8px;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    margin-top:15px;
   }
   
   h2, h3 {
@@ -52,9 +53,41 @@
     margin-top: 20px;
   }
   
+  
   table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 10
+    margin-top: 10px;
+  }
+  
+  th, td {
+    padding: 8px;
+    border: 1px solid #ccc;
+    text-align: left;
+  }
+  
+  /* Responsive Table for Small Screens */
+  @media (max-width: 600px) {
+    .table-container {
+      width: 100%;
+      overflow-x: auto; /* Enables horizontal scrolling */
+    }
+  
+    table {
+      width: 100%;
+      
+      display: block;
+      overflow-x: auto;
+    }
+  
+    th, td {
+      font-size: 14px;
+      padding: 6px;
+    }
+  
+    .job-container {
+      max-width: 100%;
+      padding: 10px;
+    }
   }
   

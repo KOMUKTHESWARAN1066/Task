@@ -4,12 +4,18 @@ import "./CustomerJobMaster.css";
 import moment from "moment-timezone";
 
 
+const empID = localStorage.getItem("empID");
+const flag = localStorage.getItem("flag");
+
+
 const CustomerJobMaster = () => {
   const [formData, setFormData] = useState({
     customerID: "",
     jobID: "",
     jobFrequency: "",
     jobDate: "",
+    receivedDate: "",
+    dueDate: "",
     employeeID: "",
   });
 
@@ -18,11 +24,13 @@ const CustomerJobMaster = () => {
   const [jobs, setJobs] = useState([]);
   const [savedjobs, setsavedJobs] = useState([]);
   const [editingId, setEditingId] = useState(null);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     fetchCustomers();
     fetchEmployees();
     fetchJobs();
+    fetchsavedJobs(); // <-- Ensure saved jobs are fetched
   }, []);
 
   const fetchCustomers = async () => {
@@ -47,20 +55,27 @@ const CustomerJobMaster = () => {
     }
   };
 
-  const fetchJobs = () => {
-    axios
-      .get("api/jobs")
-      .then((response) => setJobs(response.data))
-      .catch((error) => console.error("Error fetching jobs:", error));
+  const fetchJobs = async () => {
+    try {
+      const response = await axios.get("https://103.38.50.149:5001/api/jobs");
+      setJobs(response.data || []);
+    } catch (error) {
+      console.error("Error fetching jobs:", error);
+    }
   };
 
-  const fetchsavedJobs = () => {
-    axios
-      .get("https://103.38.50.149:5001/api/customer-jobs")
-      .then((response) => console.log("savedjobs", response.data))
-      .catch((error) => console.error("Error fetching jobs:", error));
+  const fetchsavedJobs = async () => {
+    try {
+      const response = await axios.get(
+        "https://103.38.50.149:5001/api/customer-jobs"
+      );
+ 
+      setsavedJobs(response.data || []);
+    } catch (error) {
+      console.error("Error fetching saved jobs:", error);
+    }
   };
-  console.log("saved", savedjobs);
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -68,12 +83,13 @@ const CustomerJobMaster = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate all required fields
     if (
       !formData.customerID ||
       !formData.jobID ||
       !formData.jobFrequency ||
       !formData.jobDate ||
+      !formData.receivedDate ||
+      !formData.dueDate ||
       !formData.employeeID
     ) {
       alert("Please fill in all required fields.");
@@ -83,33 +99,56 @@ const CustomerJobMaster = () => {
     try {
       const payload = {
         ...formData,
-        // Convert employeeID to number
         employeeID: Number(formData.employeeID),
-        // Format date for SQL Server
-        jobDate: moment(formData.jobDate).format("YYYY-MM-DDTHH:mm:ss.SSSZ"),
+        jobDate: moment.utc(formData.jobDate).format(),
+        receivedbDate: moment.utc(formData.receivedDate).format(),
+        dueDate: moment.utc(formData.dueDate).format(),
       };
+      console.log(payload)
 
       if (editingId) {
         await axios.put(
           `https://103.38.50.149:5001/api/customer-jobs/${editingId}`,
           payload
         );
+        setMessage("Job updated successfully!"); // ✅ Success message for editing
       } else {
-        await axios.post(
+        const response = await axios.post(
           "https://103.38.50.149:5001/api/customer-jobs",
           payload
         );
+
+        if (response.data.success) {
+          setMessage("Job added successfully!"); // ✅ Success message for adding
+          fetchCustomers(); // Refresh customer list
+        } else {
+          setMessage("Failed to add job.");
+        }
+        console.log(
+          "Original:",
+          formData.jobDate,
+          "Converted:",
+          moment(formData.jobDate).format("YYYY-MM-DDTHH:mm:ss.SSSZ"),
+          moment(formData.receivedDate).format("YYYY-MM-DDTHH:mm:ss.SSSZ"),
+          moment(formData.dueDate).format("YYYY-MM-DDTHH:mm:ss.SSSZ"),
+          "UTC Date:",
+          new Date(formData.jobDate).toISOString()
+        );
       }
 
-      fetchJobs();
       fetchsavedJobs();
       resetForm();
     } catch (error) {
-      console.error("Error saving job:", error.response?.data || error.message);
-      alert(
-        error.response?.data?.message ||
-          "Error saving job. Check console for details."
-      );
+      if (error.response && error.response.status === 400) {
+        setMessage("Job already exists.");
+      } else {
+        console.error("Error saving job:", error);
+        setMessage("Error saving job.");
+        alert(
+          error.response?.data?.message ||
+            "Error saving job. Check console for details."
+        );
+      }
     }
   };
 
@@ -119,16 +158,23 @@ const CustomerJobMaster = () => {
       jobID: job.jobID,
       jobFrequency: job.jobFrequency,
       jobDate: moment(job.jobDate).format("YYYY-MM-DD"),
-      employeeID: job.employeeID.toString(), // Convert to string for select input
+      receivedDate: moment(job.receivedDate).format("YYYY-MM-DD"),
+      dueDate: moment(job.dueDate).format("YYYY-MM-DD"),
+      employeeID: job.employeeID.toString(),
     });
     setEditingId(job.customerJobID);
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this job?")) return;
+
     try {
+      // Check if the employee is assigned to any job before deleting
+      const assignedJobs = savedjobs.filter((job) => job.employeeID === id);
+
       await axios.delete(`https://103.38.50.149:5001/api/customer-jobs/${id}`);
-      fetchJobs();
+      setMessage("Job deleted successfully.");
+      fetchsavedJobs();
     } catch (error) {
       console.error(
         "Error deleting job:",
@@ -137,163 +183,169 @@ const CustomerJobMaster = () => {
       alert("Error deleting job. Check console for details.");
     }
   };
-
   const resetForm = () => {
     setFormData({
       customerID: "",
       jobID: "",
       jobFrequency: "",
       jobDate: "",
+      receivedDate: "",
+      dueDate: "",
       employeeID: "",
     });
     setEditingId(null);
   };
 
   return (
-    <div>
-     
-
-      <div className="job-container">
-        <h2>Customer Job Master</h2>
-        <form className="job-form" onSubmit={handleSubmit}>
-          {/* Customer Dropdown */}
-          <div className="form-group">
-            <label>Customer Name:</label>
-            <select
-              name="customerID"
-              value={formData.customerID}
-              onChange={handleChange}
-              required
-            >
-              <option value="">Select Customer</option>
-              {customers.map((customer) => (
-                <option key={customer.customerID} value={customer.customerID}>
-                  {customer.customerName}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Job Dropdown */}
-          <div className="form-group">
-            <label>Job Name:</label>
-            <select
-              name="jobID"
-              value={formData.jobID}
-              onChange={handleChange}
-              required
-            >
-              <option value="">Select Job</option>
-              {jobs.map((job) => (
-                <option key={job.jobID} value={job.jobID}>
-                  {job.jobName || "N/A"}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Frequency Dropdown */}
-          <div className="form-group">
-            <label>Frequency:</label>
-            <select
-              name="jobFrequency"
-              value={formData.jobFrequency}
-              onChange={handleChange}
-              required
-            >
-              <option value="">Select Frequency</option>
-              <option value="Daily">Daily</option>
-              <option value="Weekly">Weekly</option>
-              <option value="Fortnightly">Fortnightly</option>
-              <option value="Monthly">Monthly</option>
-              <option value="Quarterly">Quarterly</option>
-              <option value="Half-Yearly">Half-Yearly</option>
-              <option value="Annually">Annually</option>
-            </select>
-          </div>
-
-          {/* Date Input */}
-          <div className="form-group">
-            <label>Job Date:</label>
-            <input
-              type="date"
-              name="jobDate"
-              value={formData.jobDate}
-              onChange={handleChange}
-              required
-            />
-          </div>
-
-          {/* Employee Dropdown */}
-          <div className="form-group">
-            <label>Employee Name:</label>
-            <select
-              name="employeeID"
-              value={formData.employeeID}
-              onChange={handleChange}
-              required
-            >
-              <option value="">Select Employee</option>
-              {employees.map((emp) => (
-                <option key={emp.id} value={emp.id}>
-                  {emp.username}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Form Buttons */}
-          <div className="form-buttons">
-            <button type="submit" className="submit-btn">
-              {editingId ? "Update" : "Create"} Job
-            </button>
-            {editingId && (
-              <button type="button" onClick={resetForm} className="cancel-btn">
-                Cancel Edit
-              </button>
-            )}
-          </div>
-        </form>
-
-        {/* Jobs List Table */}
-        <div className="job-list">
-          <h3>Existing Job Assignments</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Customer</th>
-                <th>Job</th>
-                <th>Frequency</th>
-                <th>Date</th>
-                <th>Employee</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {jobs.map((savedjobs) => (
-                <tr key={savedjobs.customerJobID}>
-                  <td>{savedjobs.CustomerMaster?.customerName}</td>
-                  <td>{savedjobs.JobMaster?.jobName}</td>
-                  <td>{savedjobs.jobFrequency}</td>
-                  <td>{moment(savedjobs.jobDate).format("DD MMM YYYY")}</td>
-                  <td>{savedjobs.User?.username}</td>
-                  <td>
-                    <button onClick={() => handleEdit(savedjobs)}>Edit</button>
-                    <button
-                      onClick={() => handleDelete(savedjobs.customerJobID)}
-                      className="delete-btn"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <div className="job-container">
+      {/* Customer Form */}
+      <h2>Customer Job Master</h2>
+      {message && <p className="message">{message}</p>}
+      <form className="job-form" onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label>Customer Name:</label>
+          <select
+            name="customerID"
+            value={formData.customerID}
+            onChange={handleChange}
+            required
+          >
+            <option value="">Select Customer</option>
+            {customers.map((customer) => (
+              <option key={customer.customerID} value={customer.customerID}>
+                {customer.customerName}
+              </option>
+            ))}
+          </select>
         </div>
-      </div>
 
-      
+        <div className="form-group">
+          <label>Job Name:</label>
+          <select
+            name="jobID"
+            value={formData.jobID}
+            onChange={handleChange}
+            required
+          >
+            <option value="">Select Job</option>
+            {jobs.map((job) => (
+              <option key={job.jobID} value={job.jobID}>
+                {job.jobName || "N/A"}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>Frequency:</label>
+          <select
+            name="jobFrequency"
+            value={formData.jobFrequency}
+            onChange={handleChange}
+            required
+          >
+            <option value="">Select Frequency</option>
+            <option value="One-Time">One Time</option>
+            <option value="Daily">Daily</option>
+            <option value="Weekly">Weekly</option>
+            <option value="Fortnightly">Fortnightly</option>
+            <option value="Monthly">Monthly</option>
+            <option value="Quarterly">Quarterly</option>
+            <option value="Half-Yearly">Half-Yearly</option>
+            <option value="Annually">Annually</option>
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>Job Date:</label>
+          <input
+            type="date"
+            name="jobDate"
+            value={formData.jobDate}
+            onChange={handleChange}
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Received Date:</label>
+          <input
+            type="date"
+            name="receivedDate"
+            value={formData.receivedDate}
+            onChange={handleChange}
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Due Date:</label>
+          <input
+            type="date"
+            name="dueDate"
+            value={formData.dueDate}
+            onChange={handleChange}
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Employee Name:</label>
+          <select
+            name="employeeID"
+            value={formData.employeeID}
+            onChange={handleChange}
+            required
+          >
+            <option value="">Select Employee</option>
+            {employees.map((emp) => (
+              <option key={emp.id} value={emp.id}>
+                {emp.employeeName}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <button type="submit">{editingId ? "Update" : "Create"} Job</button>
+      </form>
+
+      <h3>Job List</h3>
+      <table className="values">
+        <thead>
+          <tr>
+            <th>Customer</th>
+            <th>Job</th>
+            <th>Frequency</th>
+            <th>Job Date</th>
+            <th>Received Date</th>
+            <th>Due Date</th>
+            <th>Employee</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {savedjobs.map((job) => (
+            <tr key={job.customerJobID}>
+              <td>{job.customerName || "Unknown Customer"}</td>
+              <td>{job.jobName || "Unknown Job"}</td>
+              <td>{job.jobFrequency}</td>
+              <td>{moment(job.jobDate).format("DD MMM YYYY")}</td>
+              <td>{moment(job.receivedDate).format("DD MMM YYYY")}</td>
+              <td>{moment(job.dueDate).format("DD MMM YYYY")}</td>
+              <td>{job.employeeName || "Unknown Employee"}</td>
+              <td>
+                <button onClick={() => handleEdit(job)}>Edit</button>
+                <button
+                  onClick={() => handleDelete(job.customerJobID)}
+                  className="delete-btn"
+                >
+                  Delete
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 };

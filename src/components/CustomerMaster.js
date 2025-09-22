@@ -4,9 +4,13 @@ import "./CustomerMaster.css";
 import { v4 as uuidv4 } from "uuid";
 
 
+const empID = localStorage.getItem("empID");
+const flag = localStorage.getItem("flag");
+
 const CustomerMaster = () => {
   const [customerID] = useState(uuidv4()); // Generate a unique ID
   const [formData, setFormData] = useState({
+    TypeOfCustomer:"",
     customerName: "",
     address1: "",
     address2: "",
@@ -16,11 +20,16 @@ const CustomerMaster = () => {
     countryID: "",
     pincode: "",
     gstNo: "",
+    tanNo: "",
+    pfNo: "",
+    esiNo: "",
+    panNo: "",
     mobileNo: "",
+    Authorized_Person: "",
+    Authorized_Person_Contant_Number: "",
+    Authorized_Person_Mail_Id: "",
     emailID: "",
     active: "Y",
-    jobName: "",
-    jobFrequency: "",
   });
 
   const [countries, setCountries] = useState([]);
@@ -50,7 +59,7 @@ const CustomerMaster = () => {
       const response = await axios.get(
         `https://103.38.50.149:5001/api/states/${countryID}`
       );
-      console.log("States response:", response.data);
+      
       setStates(response.data);
     } catch (error) {
       console.error("Error fetching states:", error);
@@ -62,6 +71,7 @@ const CustomerMaster = () => {
       const response = await axios.get(
         "https://103.38.50.149:5001/api/customers"
       );
+      console.log(response.data)
       setCustomers(response.data);
     } catch (error) {
       console.error("Error fetching customers:", error);
@@ -108,6 +118,7 @@ const CustomerMaster = () => {
           ...formData,
         }
       );
+      console.log(response.data)
 
       if (response.data.success) {
         setMessage("Customer added successfully!");
@@ -116,14 +127,18 @@ const CustomerMaster = () => {
         setMessage("Failed to add customer.");
       }
     } catch (error) {
-      console.error("Error saving customer:", error);
-      setMessage("Error saving customer.");
+      if (error.response && error.response.status === 400) {
+        setMessage("customer already exists.");
+      } else {
+        console.error("Error saving customer:", error);
+        setMessage("Error saving customer.");
+      }
     }
   };
 
   return (
     <div>
-      
+      {/* Customer Form */}
       <div className="customer-container">
         <h2>Customer Details</h2>
         {message && <p className="message">{message}</p>}
@@ -131,6 +146,20 @@ const CustomerMaster = () => {
           <div className="form-group" style={{ display: "none" }}>
             <label>Customer ID:</label>
             <input type="text" value={customerID} disabled />
+          </div>
+          <div className="form-group">
+            <label>Type Of Customer:</label>
+            <select name="TypeOfCustomer" onChange={handleChange}>
+              <option value="">Select Type Of Customer</option>
+              <option value="Individual">Individual</option>
+              <option value="Proprietor">Proprietor</option>
+              <option value="Partnership">Partnership</option>
+              <option value="Private_Limited">Private Limited</option>
+              <option value="Public_Limited">Public Limited</option>
+              <option value="Society">Society</option>
+              <option value="Trust">Trust</option>
+              <option value="HUF">HUF</option>
+            </select>
           </div>
           <div className="form-group">
             <label>Customer Name:</label>
@@ -204,7 +233,10 @@ const CustomerMaster = () => {
                   </option>
                 ))
               ) : (
-                <option disabled>Loading states...</option>
+                <option disabled>
+                  {" "}
+                  No states available for the selected country.
+                </option>
               )}
             </select>
           </div>
@@ -218,11 +250,47 @@ const CustomerMaster = () => {
             />
           </div>
           <div className="form-group">
+            <label>PAN No:</label>
+            <input
+              type="text"
+              name="panNo"
+              placeholder="Enter PAN No"
+              onChange={handleChange}
+            />
+          </div>
+          <div className="form-group">
             <label>GST No:</label>
             <input
               type="text"
               name="gstNo"
               placeholder="Enter GST No"
+              onChange={handleChange}
+            />
+          </div>
+          <div className="form-group">
+            <label>TAN No:</label>
+            <input
+              type="text"
+              name="tanNo"
+              placeholder="Enter TAN No"
+              onChange={handleChange}
+            />
+          </div>
+          <div className="form-group">
+            <label>PF No:</label>
+            <input
+              type="text"
+              name="pfNo"
+              placeholder="Enter PF No"
+              onChange={handleChange}
+            />
+          </div>
+          <div className="form-group">
+            <label>ESI No:</label>
+            <input
+              type="text"
+              name="esiNo"
+              placeholder="Enter ESI No"
               onChange={handleChange}
             />
           </div>
@@ -246,26 +314,31 @@ const CustomerMaster = () => {
             />
           </div>
           <div className="form-group">
-            <label>Job Name:</label>
+            <label>Authorized Person:</label>
             <input
-              type="text"
-              name="jobName"
-              placeholder="Enter Job Name"
+              type="Authorized_Person"
+              name="Authorized_Person"
+              placeholder="Authorized Person"
               onChange={handleChange}
             />
           </div>
           <div className="form-group">
-            <label>Job Frequency:</label>
-            <select name="active" onChange={handleChange}>
-              <option value="">Select Frequency</option>
-              <option value="Daily">Daily</option>
-              <option value="Weekly">Weekly</option>
-              <option value="Fortnight">Fortnight</option>
-              <option value="Monthly">Monthly</option>
-              <option value="QuarterlyN">Quarterly</option>
-              <option value="HalfYearly">HalfYearly</option>
-              <option value="Annual">Annual</option>
-            </select>
+            <label>Authorized Person Contant Number :</label>
+            <input
+              type="Authorized_Person_Contant_Number"
+              name="Authorized_Person_Contant_Number"
+              placeholder="Authorized Person Contant Number"
+              onChange={handleChange}
+            />
+          </div>
+          <div className="form-group">
+            <label>Authorized Person Mail Id :</label>
+            <input
+              type="Authorized_Person_Mail_Id"
+              name="Authorized_Person_Mail_Id"
+              placeholder="Authorized Person Mail Id"
+              onChange={handleChange}
+            />
           </div>
           <div className="form-group">
             <label>Active:</label>
@@ -287,6 +360,7 @@ const CustomerMaster = () => {
         <table border="1">
           <thead>
             <tr>
+              <th>Type Of Customer</th>
               <th>Customer Name</th>
               <th>Address</th>
               <th>City</th>
@@ -294,10 +368,14 @@ const CustomerMaster = () => {
               <th>Country ID</th>
               <th>Pincode</th>
               <th>GST No</th>
+              <th>TAN No</th>
+              <th>PF No</th>
+              <th>ESI No</th>
               <th>Mobile No</th>
+              <th>Authorized Person</th>
+              <th>Authorized Person Contant Number</th>
+              <th>Authorized Person Mail</th>
               <th>Email</th>
-              <th>Job Name</th>
-              <th>Job Frequency</th>
               <th>Active</th>
             </tr>
           </thead>
@@ -305,6 +383,7 @@ const CustomerMaster = () => {
             {customers.length > 0 ? (
               customers.map((customer) => (
                 <tr key={customer.customerID}>
+                  <td>{customer.TypeOfCustomer}</td>
                   <td>{customer.customerName}</td>
                   <td>{`${customer.address1}, ${customer.address2}, ${customer.address3}`}</td>
                   <td>{customer.city}</td>
@@ -312,10 +391,14 @@ const CustomerMaster = () => {
                   <td>{customer.countryID}</td>
                   <td>{customer.pincode}</td>
                   <td>{customer.gstNo}</td>
+                  <td>{customer.tanNo}</td>
+                  <td>{customer.pfNo}</td>
+                  <td>{customer.esiNo}</td>
                   <td>{customer.mobileNo}</td>
+                  <td>{customer.Authorized_Person}</td>
+                  <td>{customer.Authorized_Person_Contant_Number}</td>
+                  <td>{customer.Authorized_Person_Mail_Id}</td>
                   <td>{customer.emailID}</td>
-                  <td>{customer.jobName}</td>
-                  <td>{customer.jobFrequency}</td>
                   <td>{customer.active}</td>
                 </tr>
               ))
@@ -327,8 +410,6 @@ const CustomerMaster = () => {
           </tbody>
         </table>
       </div>
-
-      
     </div>
   );
 };
